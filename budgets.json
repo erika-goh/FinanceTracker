@@ -1,0 +1,16 @@
+[
+  {
+    "id": "135d1242-831e-4a2e-9a93-5c4dea901f91",
+    "userId": "14628b8e-3244-4f04-9c04-a6c2c917fa7b",
+    "category": "Transportation",
+    "month": "2025-11",
+    "amount": 50
+  },
+  {
+    "id": "2c67fd71-419b-466c-a69a-a3f39481c97b",
+    "userId": "02846989-48c3-4f68-a299-16375564f203",
+    "category": "Business",
+    "month": "2025-07",
+    "amount": 900
+  }
+]
