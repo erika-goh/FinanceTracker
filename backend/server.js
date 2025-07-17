@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs-extra';
+import multer from 'multer';
+import path from 'path';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,6 +71,32 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Set up multer for file uploads
+const UPLOADS_DIR = path.join(process.cwd(), 'backend', 'uploads');
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+const upload = multer({ storage });
+
+// Serve uploads as static files
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Image upload endpoint
+app.post('/api/upload', authenticateToken, upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+  // Return the public URL to the uploaded image
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
 
 // Register (only allow the one account)
 app.post('/api/auth/register', async (req, res) => {
@@ -142,7 +170,7 @@ app.get('/api/auth/profile', authenticateToken, (req, res) => {
 // Transactions
 app.post('/api/transactions', authenticateToken, (req, res) => {
   try {
-    const { type, amount, category, description, date } = req.body;
+    const { type, amount, category, description, date, imageUrl } = req.body;
 
     if (!type || !amount || !category) {
       return res.status(400).json({ message: 'Type, amount, and category are required' });
@@ -156,7 +184,8 @@ app.post('/api/transactions', authenticateToken, (req, res) => {
       category,
       description: description || '',
       date: date || new Date().toISOString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      imageUrl: imageUrl || null
     };
 
     transactions.push(transaction);
