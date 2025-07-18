@@ -12,5 +12,12 @@
     "category": "Business",
     "month": "2025-07",
     "amount": 900
+  },
+  {
+    "id": "be8e64ba-10cb-4371-a11c-517d576bd386",
+    "userId": "bf88661b-5f71-4007-a089-186196978211",
+    "category": "Entertainment",
+    "month": "2025-07",
+    "amount": 400
   }
 ]

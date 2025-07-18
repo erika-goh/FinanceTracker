@@ -1,18 +1,13 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const API_ENDPOINTS = {
-  // Auth endpoints
-  REGISTER: `${BASE_URL}/auth/register`,
-  LOGIN: `${BASE_URL}/auth/login`,
-  PROFILE: `${BASE_URL}/auth/profile`,
-  
   // Transaction endpoints
   TRANSACTIONS: `${BASE_URL}/transactions`,
   TRANSACTION: (id) => `${BASE_URL}/transactions/${id}`,
-  
+
   // Summary endpoints
   SUMMARY: `${BASE_URL}/summary`,
-  
+
   // Budget endpoints
   BUDGETS: `${BASE_URL}/budgets`,
   BUDGET: (id) => `${BASE_URL}/budgets/${id}`,

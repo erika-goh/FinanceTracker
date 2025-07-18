@@ -24,6 +24,7 @@ const Expense = () => {
   });
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -50,11 +51,34 @@ const Expense = () => {
       return;
     }
 
+    let imageUrl = null;
+    if (imageFile) {
+      const data = new FormData();
+      data.append('image', imageFile);
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+          method: 'POST',
+          body: data
+        });
+        const result = await res.json();
+        if (res.ok) {
+          imageUrl = result.imageUrl;
+        } else {
+          setError(result.message || 'Image upload failed');
+          return;
+        }
+      } catch (err) {
+        setError('Image upload failed');
+        return;
+      }
+    }
+
     try {
       const transactionData = {
         ...formData,
         type: 'expense',
-        amount: parseFloat(formData.amount)
+        amount: parseFloat(formData.amount),
+        imageUrl
       };
 
       if (editingId) {
@@ -69,6 +93,7 @@ const Expense = () => {
         description: '',
         date: new Date().toISOString().split('T')[0]
       });
+      setImageFile(null);
       setEditingId(null);
       setShowForm(false);
       fetchTransactions();
@@ -262,6 +287,18 @@ const Expense = () => {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Receipt/Image (Optional)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => setImageFile(e.target.files[0])}
+                className="input"
+              />
+            </div>
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -313,6 +350,13 @@ const Expense = () => {
                     <p className="text-xs text-gray-400">
                       {new Date(transaction.date).toLocaleDateString()}
                     </p>
+                    {transaction.imageUrl && (
+                      <img
+                        src={transaction.imageUrl.startsWith('http') ? transaction.imageUrl : `${import.meta.env.VITE_API_URL.replace('/api','')}${transaction.imageUrl}`}
+                        alt="Receipt"
+                        className="mt-2 max-h-24 rounded border"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

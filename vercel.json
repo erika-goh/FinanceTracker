@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd frontend/FinanceTracker && npm install && npm run build",
+  "outputDirectory": "frontend/FinanceTracker/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+} 
