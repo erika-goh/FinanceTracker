@@ -3,17 +3,51 @@ import { API_ENDPOINTS } from './apiPaths.js';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_ENDPOINTS.TRANSACTIONS.replace(/\/transactions.*/, ''),
+  baseURL: 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Transaction API
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authAPI = {
+  register: (userData) => api.post('/auth/register', userData),
+  login: (credentials) => api.post('/auth/login', credentials),
+  getProfile: () => api.get('/auth/profile'),
+};
+
+// Transactions API
 export const transactionsAPI = {
   getAll: () => api.get('/transactions'),
-  create: (data) => api.post('/transactions', data),
-  update: (id, data) => api.put(`/transactions/${id}`, data),
+  create: (transaction) => api.post('/transactions', transaction),
+  update: (id, transaction) => api.put(`/transactions/${id}`, transaction),
   delete: (id) => api.delete(`/transactions/${id}`),
 };
 
@@ -25,8 +59,8 @@ export const summaryAPI = {
 // Budgets API
 export const budgetsAPI = {
   getAll: () => api.get('/budgets'),
-  create: (data) => api.post('/budgets', data),
-  update: (id, data) => api.put(`/budgets/${id}`, data),
+  create: (budget) => api.post('/budgets', budget),
+  update: (id, budget) => api.put(`/budgets/${id}`, budget),
   delete: (id) => api.delete(`/budgets/${id}`),
 };
 
