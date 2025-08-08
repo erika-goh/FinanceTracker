@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
 import { 
   Home, 
   TrendingUp, 
   TrendingDown, 
-  LogOut, 
-  User,
   Menu,
   X
 } from 'lucide-react';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
   const location = useLocation();
 
   const navItems = [
@@ -21,10 +17,6 @@ const Navigation = () => {
     { path: '/income', label: 'Income', icon: TrendingUp },
     { path: '/expenses', label: 'Expenses', icon: TrendingDown },
   ];
-
-  const handleLogout = () => {
-    logout();
-  };
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -56,21 +48,6 @@ const Navigation = () => {
                 </Link>
               );
             })}
-          </div>
-
-          {/* User Menu */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-700">
-              <User className="h-4 w-4" />
-              <span>{user?.name}</span>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -112,22 +89,6 @@ const Navigation = () => {
                 </Link>
               );
             })}
-            <div className="border-t border-gray-200 pt-4 mt-4">
-              <div className="flex items-center space-x-3 px-3 py-2 text-gray-700">
-                <User className="h-5 w-5" />
-                <span>{user?.name}</span>
-              </div>
-              <button
-                onClick={() => {
-                  handleLogout();
-                  setIsMenuOpen(false);
-                }}
-                className="flex items-center space-x-3 px-3 py-2 text-gray-600 hover:text-red-600 transition-colors w-full"
-              >
-                <LogOut className="h-5 w-5" />
-                <span>Logout</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
