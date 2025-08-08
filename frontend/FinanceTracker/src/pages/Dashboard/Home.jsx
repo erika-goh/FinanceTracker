@@ -120,18 +120,39 @@ const Home = () => {
   };
   const incomeBarOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      title: { display: true, text: 'Income by Category (Bar)' },
+      title: { display: true, text: 'Income by Category' },
     },
     scales: {
-      y: { beginAtZero: true },
+      y: { 
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return '$' + value;
+          }
+        }
+      },
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 0
+        }
+      }
     },
   };
 
   // Prepare data for Expense Line Chart
   const expenseLineData = {
-    labels: summary?.expenseByDate ? Object.keys(summary.expenseByDate) : [],
+    labels: summary?.expenseByDate ? Object.keys(summary.expenseByDate).map(dateStr => {
+      // Convert the long date string to a simple format
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }) : [],
     datasets: [
       {
         label: 'Expenses',
@@ -145,12 +166,26 @@ const Home = () => {
   };
   const expenseLineOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      title: { display: true, text: 'Expenses Over Time (Line)' },
+      title: { display: true, text: 'Expenses Over Time' },
     },
     scales: {
-      y: { beginAtZero: true },
+      y: { 
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return '$' + value;
+          }
+        }
+      },
+      x: {
+        ticks: {
+          maxRotation: 0,
+          minRotation: 0
+        }
+      }
     },
   };
 
@@ -324,10 +359,14 @@ const Home = () => {
       {/* Graphs Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="card p-4 flex flex-col items-center justify-center w-full">
-          <Bar data={incomeBarData} options={incomeBarOptions} />
+          <div className="w-full h-64">
+            <Bar data={incomeBarData} options={incomeBarOptions} />
+          </div>
         </div>
         <div className="card p-4 w-full">
-          <Line data={expenseLineData} options={expenseLineOptions} />
+          <div className="w-full h-64">
+            <Line data={expenseLineData} options={expenseLineOptions} />
+          </div>
         </div>
       </div>
 
