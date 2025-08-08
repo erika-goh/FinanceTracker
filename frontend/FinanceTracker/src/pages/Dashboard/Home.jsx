@@ -40,12 +40,21 @@ const Home = () => {
     fetchBudgets();
   }, [location.pathname]);
 
+  // Debug summary state
+  useEffect(() => {
+    console.log('Summary state changed:', summary);
+  }, [summary]);
+
   const fetchData = async () => {
     try {
+      console.log('Fetching data...');
       const [summaryRes, transactionsRes] = await Promise.all([
         summaryAPI.getSummary(),
         transactionsAPI.getAll()
       ]);
+      
+      console.log('Summary response:', summaryRes);
+      console.log('Transactions response:', transactionsRes);
       
       setSummary(summaryRes.data);
       setRecentTransactions(transactionsRes.data.transactions.slice(0, 5));
@@ -66,6 +75,11 @@ const Home = () => {
   };
 
   const formatCurrency = (amount) => {
+    console.log('formatCurrency called with:', amount, typeof amount);
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      console.log('Invalid amount, returning $0.00');
+      return '$0.00';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
