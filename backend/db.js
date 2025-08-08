@@ -11,14 +11,16 @@ const pool = new Pool({
   }
 });
 
-// Test the connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to the database:', err);
-  } else {
-    console.log('Connected to Neon database successfully!');
-    release();
-  }
-});
+// Only test connection if DATABASE_URL is provided
+if (process.env.DATABASE_URL && process.env.DATABASE_URL !== 'postgresql://placeholder:placeholder@placeholder:5432/placeholder?sslmode=require') {
+  pool.connect((err, client, release) => {
+    if (err) {
+      console.error('Error connecting to the database:', err);
+    } else {
+      console.log('Connected to Neon database successfully!');
+      release();
+    }
+  });
+}
 
 export default pool; 
