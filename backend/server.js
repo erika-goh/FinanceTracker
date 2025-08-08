@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs-extra';
 import multer from 'multer';
 import path from 'path';
-import pool from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,6 +11,29 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// In-memory storage for now (will be replaced with database)
+let transactions = [];
+let budgets = [];
+
+// Load budgets from budgets.json if it exists
+const BUDGETS_FILE = './budgets.json';
+try {
+  if (fs.existsSync(BUDGETS_FILE)) {
+    budgets = fs.readJsonSync(BUDGETS_FILE);
+  }
+} catch (err) {
+  console.error('Error loading budgets:', err);
+  budgets = [];
+}
+
+function saveBudgets() {
+  try {
+    fs.writeJsonSync(BUDGETS_FILE, budgets, { spaces: 2 });
+  } catch (err) {
+    console.error('Error saving budgets:', err);
+  }
+}
 
 // Set up multer for file uploads
 const UPLOADS_DIR = path.join(process.cwd(), 'backend', 'uploads');
@@ -38,7 +62,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 // Transactions API
-app.post('/api/transactions', async (req, res) => {
+app.post('/api/transactions', (req, res) => {
   try {
     const { type, amount, category, description, date, imageUrl } = req.body;
 
@@ -46,16 +70,19 @@ app.post('/api/transactions', async (req, res) => {
       return res.status(400).json({ message: 'Type, amount, and category are required' });
     }
 
-    const query = `
-      INSERT INTO transactions (type, amount, category, description, date, image_url)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `;
-    
-    const values = [type, parseFloat(amount), category, description || '', date || new Date().toISOString(), imageUrl || null];
-    
-    const result = await pool.query(query, values);
-    res.status(201).json({ message: 'Transaction created', transaction: result.rows[0] });
+    const transaction = {
+      id: uuidv4(),
+      type, // 'income' or 'expense'
+      amount: parseFloat(amount),
+      category,
+      description: description || '',
+      date: date || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      imageUrl: imageUrl || null
+    };
+
+    transactions.push(transaction);
+    res.status(201).json({ message: 'Transaction created', transaction });
   } catch (error) {
     console.error('Error creating transaction:', error);
     res.status(500).json({ message: 'Server error' });
@@ -63,38 +90,26 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 // Get all transactions
-app.get('/api/transactions', async (req, res) => {
-  try {
-    const query = 'SELECT * FROM transactions ORDER BY date DESC';
-    const result = await pool.query(query);
-    res.json({ transactions: result.rows });
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+app.get('/api/transactions', (req, res) => {
+  res.json({ transactions });
 });
 
 // Update transaction
-app.put('/api/transactions/:id', async (req, res) => {
+app.put('/api/transactions/:id', (req, res) => {
   try {
     const { id } = req.params;
     const { type, amount, category, description, date, imageUrl } = req.body;
-    
-    const query = `
-      UPDATE transactions 
-      SET type = $1, amount = $2, category = $3, description = $4, date = $5, image_url = $6
-      WHERE id = $7
-      RETURNING *
-    `;
-    
-    const values = [type, parseFloat(amount), category, description, date, imageUrl, id];
-    const result = await pool.query(query, values);
-    
-    if (result.rows.length === 0) {
+    const transaction = transactions.find(t => t.id === id);
+    if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
-    
-    res.json({ message: 'Transaction updated', transaction: result.rows[0] });
+    transaction.type = type || transaction.type;
+    transaction.amount = amount ? parseFloat(amount) : transaction.amount;
+    transaction.category = category || transaction.category;
+    transaction.description = description !== undefined ? description : transaction.description;
+    transaction.date = date || transaction.date;
+    transaction.imageUrl = imageUrl !== undefined ? imageUrl : transaction.imageUrl;
+    res.json({ message: 'Transaction updated', transaction });
   } catch (error) {
     console.error('Error updating transaction:', error);
     res.status(500).json({ message: 'Server error' });
@@ -102,17 +117,14 @@ app.put('/api/transactions/:id', async (req, res) => {
 });
 
 // Delete transaction
-app.delete('/api/transactions/:id', async (req, res) => {
+app.delete('/api/transactions/:id', (req, res) => {
   try {
     const { id } = req.params;
-    
-    const query = 'DELETE FROM transactions WHERE id = $1 RETURNING *';
-    const result = await pool.query(query, [id]);
-    
-    if (result.rows.length === 0) {
+    const transactionIndex = transactions.findIndex(t => t.id === id);
+    if (transactionIndex === -1) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
-    
+    transactions.splice(transactionIndex, 1);
     res.json({ message: 'Transaction deleted' });
   } catch (error) {
     console.error('Error deleting transaction:', error);
@@ -121,156 +133,98 @@ app.delete('/api/transactions/:id', async (req, res) => {
 });
 
 // Get summary statistics
-app.get('/api/summary', async (req, res) => {
-  try {
-    // Get total income and expenses
-    const incomeQuery = `
-      SELECT COALESCE(SUM(amount), 0) as total_income 
-      FROM transactions 
-      WHERE type = 'income'
-    `;
-    const expenseQuery = `
-      SELECT COALESCE(SUM(amount), 0) as total_expenses 
-      FROM transactions 
-      WHERE type = 'expense'
-    `;
-    
-    const [incomeResult, expenseResult] = await Promise.all([
-      pool.query(incomeQuery),
-      pool.query(expenseQuery)
-    ]);
-    
-    const totalIncome = parseFloat(incomeResult.rows[0].total_income);
-    const totalExpenses = parseFloat(expenseResult.rows[0].total_expenses);
-    const balance = totalIncome - totalExpenses;
-    
-    // Get category statistics
-    const categoryQuery = `
-      SELECT category, type, SUM(amount) as total
-      FROM transactions
-      GROUP BY category, type
-      ORDER BY category, type
-    `;
-    const categoryResult = await pool.query(categoryQuery);
-    
-    const categoryStats = {};
-    categoryResult.rows.forEach(row => {
-      if (!categoryStats[row.category]) {
-        categoryStats[row.category] = { income: 0, expense: 0 };
-      }
-      if (row.type === 'income') {
-        categoryStats[row.category].income += parseFloat(row.total);
-      } else {
-        categoryStats[row.category].expense += parseFloat(row.total);
-      }
+app.get('/api/summary', (req, res) => {
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const balance = totalIncome - totalExpenses;
+  const categoryStats = {};
+  transactions.forEach(t => {
+    if (!categoryStats[t.category]) {
+      categoryStats[t.category] = { income: 0, expense: 0 };
+    }
+    if (t.type === 'income') {
+      categoryStats[t.category].income += t.amount;
+    } else {
+      categoryStats[t.category].expense += t.amount;
+    }
+  });
+  // Calculate expenses by date
+  const expenseByDate = {};
+  transactions
+    .filter(t => t.type === 'expense')
+    .forEach(t => {
+      const date = t.date.split('T')[0]; // Use only the date part
+      if (!expenseByDate[date]) expenseByDate[date] = 0;
+      expenseByDate[date] += t.amount;
     });
-    
-    // Get expenses by date
-    const dateQuery = `
-      SELECT DATE(date) as date, SUM(amount) as total
-      FROM transactions
-      WHERE type = 'expense'
-      GROUP BY DATE(date)
-      ORDER BY date
-    `;
-    const dateResult = await pool.query(dateQuery);
-    
-    const expenseByDate = {};
-    dateResult.rows.forEach(row => {
-      expenseByDate[row.date] = parseFloat(row.total);
-    });
-    
-    // Get transaction count
-    const countQuery = 'SELECT COUNT(*) as count FROM transactions';
-    const countResult = await pool.query(countQuery);
-    
-    res.json({
-      totalIncome,
-      totalExpenses,
-      balance,
-      categoryStats,
-      transactionCount: parseInt(countResult.rows[0].count),
-      expenseByDate
-    });
-  } catch (error) {
-    console.error('Error fetching summary:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+  res.json({
+    totalIncome,
+    totalExpenses,
+    balance,
+    categoryStats,
+    transactionCount: transactions.length,
+    expenseByDate
+  });
 });
 
 // Budgets API
-app.post('/api/budgets', async (req, res) => {
+app.post('/api/budgets', (req, res) => {
   try {
     const { category, month, amount } = req.body;
-    
     if (!category || !month || !amount) {
       return res.status(400).json({ message: 'Category, month, and amount are required' });
     }
-    
-    const query = `
-      INSERT INTO budgets (category, month, amount)
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `;
-    
-    const values = [category, month, parseFloat(amount)];
-    const result = await pool.query(query, values);
-    
-    res.status(201).json({ message: 'Budget created', budget: result.rows[0] });
+    const budget = {
+      id: uuidv4(),
+      category,
+      month, // format: YYYY-MM
+      amount: parseFloat(amount)
+    };
+    budgets.push(budget);
+    saveBudgets();
+    res.status(201).json({ message: 'Budget created', budget });
   } catch (error) {
     console.error('Error creating budget:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-app.get('/api/budgets', async (req, res) => {
-  try {
-    const query = 'SELECT * FROM budgets ORDER BY month DESC, category';
-    const result = await pool.query(query);
-    res.json({ budgets: result.rows });
-  } catch (error) {
-    console.error('Error fetching budgets:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+app.get('/api/budgets', (req, res) => {
+  res.json({ budgets });
 });
 
-app.put('/api/budgets/:id', async (req, res) => {
+app.put('/api/budgets/:id', (req, res) => {
   try {
     const { id } = req.params;
     const { category, month, amount } = req.body;
-    
-    const query = `
-      UPDATE budgets 
-      SET category = $1, month = $2, amount = $3
-      WHERE id = $4
-      RETURNING *
-    `;
-    
-    const values = [category, month, parseFloat(amount), id];
-    const result = await pool.query(query, values);
-    
-    if (result.rows.length === 0) {
+    const budget = budgets.find(b => b.id === id);
+    if (!budget) {
       return res.status(404).json({ message: 'Budget not found' });
     }
-    
-    res.json({ message: 'Budget updated', budget: result.rows[0] });
+    if (category) budget.category = category;
+    if (month) budget.month = month;
+    if (amount) budget.amount = parseFloat(amount);
+    saveBudgets();
+    res.json({ message: 'Budget updated', budget });
   } catch (error) {
     console.error('Error updating budget:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-app.delete('/api/budgets/:id', async (req, res) => {
+app.delete('/api/budgets/:id', (req, res) => {
   try {
     const { id } = req.params;
-    
-    const query = 'DELETE FROM budgets WHERE id = $1 RETURNING *';
-    const result = await pool.query(query, [id]);
-    
-    if (result.rows.length === 0) {
+    const index = budgets.findIndex(b => b.id === id);
+    if (index === -1) {
       return res.status(404).json({ message: 'Budget not found' });
     }
-    
+    budgets.splice(index, 1);
+    saveBudgets();
     res.json({ message: 'Budget deleted' });
   } catch (error) {
     console.error('Error deleting budget:', error);
